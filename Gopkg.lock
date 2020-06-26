@@ -168,7 +168,6 @@
   input-imports = [
     "github.com/avinetworks/sdk/go/clients",
     "github.com/avinetworks/sdk/go/session",
-    "github.com/golang/glog",
     "github.com/heptiolabs/healthcheck",
     "github.com/prometheus/client_golang/prometheus",
     "github.com/prometheus/client_golang/prometheus/promhttp",

@@ -3,7 +3,7 @@ pkgs = $(shell go list ./... | egrep -v "(vendor|gen)")
 
 export DOCKERHUB_USER = $(or $(DEV_DOCKERHUB_REPO), mslocrian)
 export DOCKERHUB_REPO = avi_exporter
-export DOCKERHUB_VERSION = 0.1.0
+export DOCKERHUB_VERSION = 0.1.1
 
 default:
 	$(MAKE) clean
