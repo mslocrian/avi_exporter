@@ -3,7 +3,7 @@ pkgs = $(shell go list ./... | egrep -v "(vendor|gen)")
 
 export DOCKERHUB_USER = $(or $(DEV_DOCKERHUB_REPO), mslocrian)
 export DOCKERHUB_REPO = avi_exporter
-export DOCKERHUB_VERSION = 0.1.1
+export DOCKERHUB_VERSION = 0.1.2
 
 default:
 	$(MAKE) clean
@@ -15,7 +15,7 @@ clean:
 build-local:
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -tags netgo -ldflags '-w' -o target/linux/$(OUT)
 
-build:
+build: format
 	@docker build -f Dockerfile -t $(DOCKERHUB_REPO):$(DOCKERHUB_VERSION) .
 
 push: DOCKER_IMAGE_ID = $(shell docker images -q $(DOCKERHUB_REPO):$(DOCKERHUB_VERSION))
