@@ -182,7 +182,7 @@ func (o *Exporter) getVirtualServices() (r map[string]virtualServiceDef, err err
 	var pooluuid string
 
 	if err != nil {
-		log.Fatal(err)
+		return r, err
 	}
 	r = make(map[string]virtualServiceDef)
 	for _, v := range vs {
@@ -201,7 +201,7 @@ func (o *Exporter) getVirtualServices() (r map[string]virtualServiceDef, err err
 
 		r[*v.UUID] = virtualServiceDef{Name: *v.Name, IPAddress: address, FQDN: strings.Join(dns, ","), PoolUUID: pooluuid}
 	}
-	return
+	return r, nil
 }
 
 func (o *Exporter) getClusterRuntime() (r map[string]clusterDef, err error) {
@@ -209,7 +209,7 @@ func (o *Exporter) getClusterRuntime() (r map[string]clusterDef, err error) {
 	err = o.AviClient.AviSession.Get("/api/cluster", &resp)
 
 	if err != nil {
-		log.Fatal(err)
+		return r, err
 	}
 	r = make(map[string]clusterDef)
 	for _, v := range resp.Nodes {
@@ -217,13 +217,13 @@ func (o *Exporter) getClusterRuntime() (r map[string]clusterDef, err error) {
 		dns, _ := net.LookupAddr(address)
 		r[v.VMUUID] = clusterDef{Name: v.Name, IPAddress: address, FQDN: strings.Join(dns, ",")}
 	}
-	return
+	return r, nil
 }
 
 func (o *Exporter) getServiceEngines() (r map[string]seDef, err error) {
 	se, err := o.AviClient.ServiceEngine.GetAll()
 	if err != nil {
-		log.Fatal(err)
+		return r, err
 	}
 	r = make(map[string]seDef)
 	for _, v := range se {
@@ -234,19 +234,21 @@ func (o *Exporter) getServiceEngines() (r map[string]seDef, err error) {
 		}
 		r[*v.UUID] = seDef{Name: *v.Name, IPAddress: address, FQDN: strings.Join(dns, ",")}
 	}
-	return
+	return r, nil
 }
 
 func (o *Exporter) getPools() (r map[string]poolDef, err error) {
 	vs, err := o.AviClient.Pool.GetAll()
-	if err != nil {
-		log.Fatal(err)
-	}
 	r = make(map[string]poolDef)
+
+	if err != nil {
+		return r, err
+	}
+
 	for _, v := range vs {
 		r[*v.UUID] = poolDef{Name: *v.Name}
 	}
-	return
+	return r, nil
 }
 
 // toPrettyJSON formats json output.
@@ -302,15 +304,16 @@ func (o *Exporter) getVirtualServiceMetrics() (r [][]CollectionResponse, err err
 
 	resp := make(map[string]map[string][]CollectionResponse)
 	err = o.AviClient.AviSession.Post("/api/analytics/metrics/collection", req, &resp)
+
 	if err != nil {
-		log.Fatal(err)
-		return
+		return r, err
 	}
+
 	for _, s := range resp["series"] {
 		r = append(r, s)
 	}
 
-	return
+	return r, nil
 }
 
 func (o *Exporter) getServiceEngineMetrics() (r [][]CollectionResponse, err error) {
@@ -330,14 +333,13 @@ func (o *Exporter) getServiceEngineMetrics() (r [][]CollectionResponse, err erro
 	resp := make(map[string]map[string][]CollectionResponse)
 	err = o.AviClient.AviSession.Post("/api/analytics/metrics/collection", req, &resp)
 	if err != nil {
-		log.Fatal(err)
-		return
+		return r, err
 	}
 	for _, s := range resp["series"] {
 		r = append(r, s)
 	}
 
-	return
+	return r, err
 }
 
 func (o *Exporter) getControllerMetrics() (r [][]CollectionResponse, err error) {
@@ -357,14 +359,13 @@ func (o *Exporter) getControllerMetrics() (r [][]CollectionResponse, err error) 
 	resp := make(map[string]map[string][]CollectionResponse)
 	err = o.AviClient.AviSession.Post("/api/analytics/metrics/collection", req, &resp)
 	if err != nil {
-		log.Fatal(err)
-		return
+		return r, err
 	}
 	for _, s := range resp["series"] {
 		r = append(r, s)
 	}
 
-	return
+	return r, nil
 }
 
 func (o *Exporter) setVirtualServiceMetrics() (err error) {
@@ -376,8 +377,7 @@ func (o *Exporter) setVirtualServiceMetrics() (err error) {
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	results, err := o.getVirtualServiceMetrics()
 	if err != nil {
-		log.Fatal(err)
-		return
+		return err
 	}
 	for _, v := range results {
 		for _, v1 := range v {
@@ -393,15 +393,14 @@ func (o *Exporter) setVirtualServiceMetrics() (err error) {
 			o.guages[v1.Header.Name].With(labels).Set(v1.Data[len(v1.Data)-1].Value)
 		}
 	}
-	return
+	return nil
 }
 
 func (o *Exporter) setServiceEngineMetrics() (err error) {
 	results, err := o.getServiceEngineMetrics()
 	ses, _ := o.getServiceEngines()
 	if err != nil {
-		log.Fatal(err)
-		return
+		return err
 	}
 	for _, v := range results {
 		for _, v1 := range v {
@@ -417,7 +416,7 @@ func (o *Exporter) setServiceEngineMetrics() (err error) {
 			o.guages[v1.Header.Name].With(labels).Set(v1.Data[len(v1.Data)-1].Value)
 		}
 	}
-	return
+	return nil
 }
 
 func (o *Exporter) setControllerMetrics() (err error) {
@@ -425,8 +424,7 @@ func (o *Exporter) setControllerMetrics() (err error) {
 	runtime, _ := o.getClusterRuntime()
 
 	if err != nil {
-		log.Fatal(err)
-		return
+		return err
 	}
 	for _, v := range results {
 		for _, v1 := range v {
@@ -442,5 +440,5 @@ func (o *Exporter) setControllerMetrics() (err error) {
 			o.guages[v1.Header.Name].With(labels).Set(v1.Data[len(v1.Data)-1].Value)
 		}
 	}
-	return
+	return nil
 }
