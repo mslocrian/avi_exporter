@@ -9,10 +9,13 @@ import (
 	"sort"
 	"strings"
 
+    "github.com/go-kit/kit/log"
+    "github.com/go-kit/kit/log/level"
+
 	"github.com/avinetworks/sdk/go/clients"
 	"github.com/avinetworks/sdk/go/session"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/log"
+	// "github.com/prometheus/common/log"
 	"github.com/tidwall/pretty"
 )
 
@@ -26,17 +29,17 @@ func fromJSONFile(path string, ob interface{}) (err error) {
 	openedFile, err := os.Open(path)
 	defer openedFile.Close()
 	if err != nil {
-		log.Infoln(err)
+		// log.Infoln(err)
 		return err
 	}
 	byteValue, err := ioutil.ReadAll(openedFile)
 	if err != nil {
-		log.Infoln(err)
+		// log.Infoln(err)
 		return err
 	}
 	err = json.Unmarshal(byteValue, &toReturn)
 	if err != nil {
-		log.Infoln(err)
+		// log.Infoln(err)
 		return err
 	}
 	return nil
@@ -123,17 +126,21 @@ func (o *Exporter) setUserMetrics() (r string) {
 }
 
 // NewExporter constructor.
-func NewExporter() (r *Exporter) {
+func NewExporter(username, password string) (r *Exporter) {
 	r = new(Exporter)
 	r.userMetricString = r.setUserMetrics()
+	// r.connectionOpts = r.setConnectionOpts(username, password)
 	r.connectionOpts = r.setConnectionOpts()
 	r.GaugeOptsMap = r.setPromMetricsMap()
 	return
 }
 
+// func (o *Exporter) setConnectionOpts(username, password string) (r connectionOpts) {
 func (o *Exporter) setConnectionOpts() (r connectionOpts) {
 	r.username = os.Getenv("AVI_USERNAME")
 	r.password = os.Getenv("AVI_PASSWORD")
+	//r.username = username
+	//r.password = username
 	return
 }
 
@@ -143,7 +150,7 @@ func (o *Exporter) setController(controller string) {
 
 // connect establishes the avi connection.
 func (o *Exporter) connect(cluster, tenant, api_version string) (r *clients.AviClient, err error) {
-	o.setConnectionOpts()
+	// o.setConnectionOpts()
 	o.setController(cluster)
 	// simplify avi connection
 	r, err = clients.NewAviClient(cluster, o.connectionOpts.username,
@@ -255,14 +262,21 @@ func (o *Exporter) getPools() (r map[string]poolDef, err error) {
 func toPrettyJSON(p interface{}) []byte {
 	bytes, err := json.Marshal(p)
 	if err != nil {
-		log.Infoln(err.Error())
+		// log.Infoln(err.Error())
 	}
 	return pretty.Pretty(bytes)
 }
 
+func CollectTarget(controller, username, password, tenant, api_version string, logger log.Logger) (targets string, err error) {
+    level.Info(logger).Log("username", username, "password", password)
+    e := NewExporter(username, password)
+    err = e.Collect(controller, tenant, api_version)
+    return "", err
+}
+
 // Collect retrieves metrics for Avi.
 func (o *Exporter) Collect(controller, tenant, api_version string) (err error) {
-	log.Infof("polling %s", controller)
+	// log.Infof("polling %s", controller)
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Connect to the cluster.
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////////

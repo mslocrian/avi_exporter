@@ -1,0 +1,66 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: avi-exporter
+    egress: permit
+  name: avi-exporter
+  namespace: ns-team-neteng
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: "10%"
+  selector:
+    matchLabels:
+      app: avi-exporter
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: avi-exporter
+        egress: permit
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - topologyKey: "kubernetes.io/hostname"
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 2000
+      containers:
+      - image: docker.io/mslocrian/avi_exporter:0.1.3
+        name: avi-exporter
+        env:
+        - name: AVI_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: avi-credentials
+              key: username
+        - name: AVI_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: avi-credentials
+              key: password
+        imagePullPolicy: Always
+        readinessProbe:
+          tcpSocket:
+            port: 9300
+          initialDelaySeconds: 5
+          periodSeconds: 20
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 9300
+          initialDelaySeconds: 5
+          periodSeconds: 3
+        ports:
+        - name: avi-exporter
+          protocol: TCP
+          containerPort: 9300
+        resources: {}
