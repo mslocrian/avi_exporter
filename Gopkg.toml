@@ -31,10 +31,6 @@
 
 [[constraint]]
   branch = "master"
-  name = "github.com/heptiolabs/healthcheck"
-
-[[constraint]]
-  branch = "master"
   name = "github.com/prometheus/client_golang"
 
 [[constraint]]

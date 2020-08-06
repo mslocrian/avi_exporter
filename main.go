@@ -10,7 +10,6 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	//"github.com/prometheus/common/log"
 	"github.com/prometheus/common/promlog"
 	"github.com/prometheus/common/version"
 )
@@ -103,16 +102,17 @@ func handler(w http.ResponseWriter, r *http.Request, username string, password s
 }
 
 func main() {
-    logLevel := &promlog.AllowedLevel{}
-    logLevel.Set("debug")
-    logFormat := &promlog.AllowedFormat{}
+	logLevel := &promlog.AllowedLevel{}
+	logLevel.Set("debug")
+	logFormat := &promlog.AllowedFormat{}
 
-    promlogConfig := &promlog.Config{Level: logLevel, Format: logFormat}
+	promlogConfig := &promlog.Config{Level: logLevel, Format: logFormat}
 	flag.Parse()
 	logger := promlog.New(promlogConfig)
 
 	username := os.Getenv("AVI_USERNAME")
 	password := os.Getenv("AVI_PASSWORD")
+
 	if username == "" {
 		level.Error(logger).Log("msg", "AVI_USERNAME environment variable must be set.")
 		os.Exit(1)
@@ -125,13 +125,11 @@ func main() {
 	level.Info(logger).Log("build_context", version.BuildContext())
 
 	// Set various http endpoints.
-	// e := NewExporter()
-	// e.registerGauges()
 	http.Handle("/metrics", promhttp.Handler())
-	// http.Handle("/avi", aviPromHTTPHandler(e, prometheus.DefaultGatherer, promhttp.HandlerOpts{}))
 	http.HandleFunc("/avi", func(w http.ResponseWriter, r *http.Request) {
 		handler(w, r, username, password, logger)
 	})
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>
              <head><title>AVI Exporter</title></head>
@@ -142,13 +140,6 @@ func main() {
              </html>`))
 	})
 
-	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`<html>
-		OK
-		</html>`))
-	})
-
-	//////////////////////////////////////////////////////////////////////////////
 	level.Info(logger).Log("msg", "Listening on address", "address", *listenAddress)
 	if err := http.ListenAndServe(*listenAddress, nil); err != nil {
 		level.Error(logger).Log("msg", "Error starting HTTP server", "err", err)

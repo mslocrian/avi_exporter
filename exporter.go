@@ -9,8 +9,8 @@ import (
 	"sort"
 	"strings"
 
-    "github.com/go-kit/kit/log"
-    "github.com/go-kit/kit/log/level"
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 
 	"github.com/avinetworks/sdk/go/clients"
 	"github.com/avinetworks/sdk/go/session"
@@ -126,12 +126,13 @@ func (o *Exporter) setUserMetrics() (r string) {
 }
 
 // NewExporter constructor.
-func NewExporter(username, password string) (r *Exporter) {
+func NewExporter(username, password string, logger log.Logger) (r *Exporter) {
 	r = new(Exporter)
 	r.userMetricString = r.setUserMetrics()
 	// r.connectionOpts = r.setConnectionOpts(username, password)
 	r.connectionOpts = r.setConnectionOpts()
 	r.GaugeOptsMap = r.setPromMetricsMap()
+	r.logger = logger
 	return
 }
 
@@ -161,11 +162,10 @@ func (o *Exporter) connect(cluster, tenant, api_version string) (r *clients.AviC
 	return
 }
 func (o *Exporter) registerGauges() {
-	o.guages = make(map[string]*prometheus.GaugeVec)
+	o.gauges = make(map[string]*prometheus.GaugeVec)
 	for k, v := range o.GaugeOptsMap {
 		g := prometheus.NewGaugeVec(v.GaugeOpts, v.CustomLabels)
-		prometheus.MustRegister(g)
-		o.guages[k] = g
+		o.gauges[k] = g
 	}
 }
 
@@ -267,39 +267,38 @@ func toPrettyJSON(p interface{}) []byte {
 	return pretty.Pretty(bytes)
 }
 
-func CollectTarget(controller, username, password, tenant, api_version string, logger log.Logger) (targets string, err error) {
-    level.Info(logger).Log("username", username, "password", password)
-    e := NewExporter(username, password)
-    err = e.Collect(controller, tenant, api_version)
-    return "", err
+func CollectTarget(controller, username, password, tenant, api_version string, logger log.Logger) (metrics []prometheus.Metric, err error) {
+	e := NewExporter(username, password, logger)
+	e.registerGauges()
+	metrics, err = e.Collect(controller, tenant, api_version)
+	return metrics, err
 }
 
 // Collect retrieves metrics for Avi.
-func (o *Exporter) Collect(controller, tenant, api_version string) (err error) {
-	// log.Infof("polling %s", controller)
+func (o *Exporter) Collect(controller, tenant, api_version string) (metrics []prometheus.Metric, err error) {
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Connect to the cluster.
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	o.AviClient, err = o.connect(controller, tenant, api_version)
 	if err != nil {
-		return err
+		return metrics, err
 	}
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Set promMetrics.
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	err = o.setVirtualServiceMetrics()
 	if err != nil {
-		return err
+		return metrics, err
 	}
 	err = o.setServiceEngineMetrics()
 	if err != nil {
-		return err
+		return metrics, err
 	}
 	err = o.setControllerMetrics()
 	if err != nil {
-		return err
+		return metrics, err
 	}
-	return
+	return o.metrics, err
 }
 
 func (o *Exporter) getVirtualServiceMetrics() (r [][]CollectionResponse, err error) {
@@ -395,16 +394,14 @@ func (o *Exporter) setVirtualServiceMetrics() (err error) {
 	}
 	for _, v := range results {
 		for _, v1 := range v {
-			var labels prometheus.Labels
-			labels = make(map[string]string)
-			labels["name"] = vs[v1.Header.EntityUUID].Name
-			labels["pool"] = pools[vs[v1.Header.EntityUUID].PoolUUID].Name
-			labels["tenant_uuid"] = v1.Header.TenantUUID
-			labels["controller"] = o.connectionOpts.controller
-			labels["units"] = v1.Header.Units
-			labels["fqdn"] = vs[v1.Header.EntityUUID].FQDN
-			labels["ipaddress"] = vs[v1.Header.EntityUUID].IPAddress
-			o.guages[v1.Header.Name].With(labels).Set(v1.Data[len(v1.Data)-1].Value)
+			var labelnames = []string{"name", "pool", "tenant_uuid", "controller", "units", "fqdn", "ipaddress"}
+			var labelvalues = []string{vs[v1.Header.EntityUUID].Name, pools[vs[v1.Header.EntityUUID].PoolUUID].Name, v1.Header.TenantUUID, o.connectionOpts.controller, v1.Header.Units, vs[v1.Header.EntityUUID].FQDN, vs[v1.Header.EntityUUID].IPAddress}
+			newMetric, err := prometheus.NewConstMetric(prometheus.NewDesc("avi_"+strings.Replace(v1.Header.Name, ".", "_", -1), "Service Engine Metrics", labelnames, nil),
+				prometheus.GaugeValue, v1.Data[len(v1.Data)-1].Value, labelvalues...)
+			if err != nil {
+				return err
+			}
+			o.metrics = append(o.metrics, newMetric)
 		}
 	}
 	return nil
@@ -418,16 +415,14 @@ func (o *Exporter) setServiceEngineMetrics() (err error) {
 	}
 	for _, v := range results {
 		for _, v1 := range v {
-			var labels prometheus.Labels
-			labels = make(map[string]string)
-			labels["tenant_uuid"] = v1.Header.TenantUUID
-			labels["entity_uuid"] = v1.Header.EntityUUID
-			labels["controller"] = o.connectionOpts.controller
-			labels["units"] = v1.Header.Units
-			labels["name"] = ses[v1.Header.EntityUUID].Name
-			labels["fqdn"] = ses[v1.Header.EntityUUID].FQDN
-			labels["ipaddress"] = ses[v1.Header.EntityUUID].IPAddress
-			o.guages[v1.Header.Name].With(labels).Set(v1.Data[len(v1.Data)-1].Value)
+			var labelnames = []string{"tenant_uuid", "entity_uuid", "controller", "units", "name", "fqdn", "ipaddress"}
+			var labelvalues = []string{v1.Header.TenantUUID, v1.Header.EntityUUID, o.connectionOpts.controller, v1.Header.Units, ses[v1.Header.EntityUUID].Name, ses[v1.Header.EntityUUID].FQDN, ses[v1.Header.EntityUUID].IPAddress}
+			newMetric, err := prometheus.NewConstMetric(prometheus.NewDesc("avi_"+strings.Replace(v1.Header.Name, ".", "_", -1), "Service Engine Metrics", labelnames, nil),
+				prometheus.GaugeValue, v1.Data[len(v1.Data)-1].Value, labelvalues...)
+			if err != nil {
+				return err
+			}
+			o.metrics = append(o.metrics, newMetric)
 		}
 	}
 	return nil
@@ -442,16 +437,14 @@ func (o *Exporter) setControllerMetrics() (err error) {
 	}
 	for _, v := range results {
 		for _, v1 := range v {
-			var labels prometheus.Labels
-			labels = make(map[string]string)
-			labels["tenant_uuid"] = v1.Header.TenantUUID
-			labels["entity_uuid"] = v1.Header.EntityUUID
-			labels["controller"] = o.connectionOpts.controller
-			labels["units"] = v1.Header.Units
-			labels["name"] = runtime[v1.Header.EntityUUID].Name
-			labels["fqdn"] = runtime[v1.Header.EntityUUID].FQDN
-			labels["ipaddress"] = runtime[v1.Header.EntityUUID].IPAddress
-			o.guages[v1.Header.Name].With(labels).Set(v1.Data[len(v1.Data)-1].Value)
+			var labelnames = []string{"tenant_uuid", "entity_uuid", "controller", "units", "name", "fqdn", "ipaddress"}
+			var labelvalues = []string{v1.Header.TenantUUID, v1.Header.EntityUUID, o.connectionOpts.controller, v1.Header.Units, runtime[v1.Header.EntityUUID].Name, runtime[v1.Header.EntityUUID].FQDN, runtime[v1.Header.EntityUUID].IPAddress}
+			newMetric, err := prometheus.NewConstMetric(prometheus.NewDesc("avi_"+strings.Replace(v1.Header.Name, ".", "_", -1), "Controller Metrics", labelnames, nil),
+				prometheus.GaugeValue, v1.Data[len(v1.Data)-1].Value, labelvalues...)
+			if err != nil {
+				return err
+			}
+			o.metrics = append(o.metrics, newMetric)
 		}
 	}
 	return nil

@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
-    "github.com/go-kit/kit/log/level"
+	"github.com/go-kit/kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -21,13 +21,17 @@ type collector struct {
 
 func (c collector) Collect(ch chan<- prometheus.Metric) {
 	start := time.Now()
-    targets, err := CollectTarget(c.controller, c.username, c.password, c.tenant, c.api_version, c.logger)
-    _ = targets
-    if err != nil {
-        level.Info(c.logger).Log("msg", "Error scraping target", "err", err)
-        ch <- prometheus.NewInvalidMetric(prometheus.NewDesc("avi_error", "Error scraping target", nil, nil), err)
-        return
-    }
+	metrics, err := CollectTarget(c.controller, c.username, c.password, c.tenant, c.api_version, c.logger)
+	for _, metric := range metrics {
+		// level.Info(c.logger).Log("metric", metric)
+		ch <- metric
+	}
+
+	if err != nil {
+		level.Info(c.logger).Log("msg", "Error scraping target", "err", err)
+		ch <- prometheus.NewInvalidMetric(prometheus.NewDesc("avi_error", "Error scraping target", nil, nil), err)
+		return
+	}
 	ch <- prometheus.MustNewConstMetric(
 		prometheus.NewDesc("avi_scrape_duration_seocnds", "Total AVI time scrape took (query and processing).", nil, nil),
 		prometheus.GaugeValue,

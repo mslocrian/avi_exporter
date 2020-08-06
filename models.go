@@ -4,10 +4,11 @@ import (
 	"time"
 
 	"github.com/avinetworks/sdk/go/clients"
+	"github.com/go-kit/kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-type guages map[string]*prometheus.GaugeVec
+type gauges map[string]*prometheus.GaugeVec
 
 // Connection describes the connection.
 type Connection struct {
@@ -87,7 +88,9 @@ type Exporter struct {
 	AviClient        *clients.AviClient
 	connectionOpts   connectionOpts
 	userMetricString string
-	guages           guages
+	gauges           gauges
+	logger           log.Logger
+	metrics          []prometheus.Metric
 }
 
 // Gauge describes the prometheus gauge.
