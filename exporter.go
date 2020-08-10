@@ -331,10 +331,13 @@ func (o *Exporter) Collect(controller, tenant, api_version string) (metrics []pr
 		return metrics, err
 	}
 
+	// We may not have BGP Metrics on each controller
 	err = o.seBgpPeerState()
-	if err != nil {
-		return metrics, err
-	}
+	/*
+		if err != nil {
+			return metrics, err
+		}
+	*/
 
 	err = o.seVnicPortGroup()
 	if err != nil {
@@ -514,8 +517,112 @@ func (o *Exporter) seMemDist() (err error) {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("seMemDist(): se uuid=%v\n", se.UUID)
-		fmt.Printf("seMemDist(): se memDist=%v\n", memDist)
+
+		for _, dist := range memDist {
+			var labelNames = []string{"controller", "uuid", "ip", "proc_id"}
+			var labelValues = []string{o.connectionOpts.Controller, se.UUID, se.Config.MgmtIpAddress.Addr, dist.ProcID}
+
+			newMetric, err := prometheus.NewConstMetric(prometheus.NewDesc("avi_se_mem_dist_shm_memory_mb", "AVI SE Memory Distribution Shared Memory MB", labelNames, nil),
+				prometheus.GaugeValue, float64(dist.ShmMemoryMB), labelValues...)
+			if err != nil {
+				return err
+			}
+			o.metrics = append(o.metrics, newMetric)
+
+			newMetric, err = prometheus.NewConstMetric(prometheus.NewDesc("avi_se_mem_dist_app_learning_memory_mb", "AVI SE Memory Distribution App Learning Memory MB", labelNames, nil),
+				prometheus.GaugeValue, float64(dist.AppLearningMemoryMB), labelValues...)
+			if err != nil {
+				return err
+			}
+			o.metrics = append(o.metrics, newMetric)
+
+			newMetric, err = prometheus.NewConstMetric(prometheus.NewDesc("avi_se_mem_dist_clusters", "AVI SE Memory Distribution Clusters", labelNames, nil),
+				prometheus.GaugeValue, float64(dist.Clusters), labelValues...)
+			if err != nil {
+				return err
+			}
+			o.metrics = append(o.metrics, newMetric)
+
+			newMetric, err = prometheus.NewConstMetric(prometheus.NewDesc("avi_se_mem_config_memory_mb", "AVI SE Memory Distribution Config Memory MB", labelNames, nil),
+				prometheus.GaugeValue, float64(dist.ConfigMemoryMB), labelValues...)
+			if err != nil {
+				return err
+			}
+			o.metrics = append(o.metrics, newMetric)
+
+			newMetric, err = prometheus.NewConstMetric(prometheus.NewDesc("avi_se_mem_conn_memory_mb", "AVI SE Memory Distribution Connection Memory MB", labelNames, nil),
+				prometheus.GaugeValue, float64(dist.ConnMemoryMB), labelValues...)
+			if err != nil {
+				return err
+			}
+			o.metrics = append(o.metrics, newMetric)
+
+			newMetric, err = prometheus.NewConstMetric(prometheus.NewDesc("avi_se_mem_conn_memory_per_core_mb", "AVI SE Memory Distribution Connection Memory Per Core MB", labelNames, nil),
+				prometheus.GaugeValue, float64(dist.ConnMemoryMBPerCore), labelValues...)
+			if err != nil {
+				return err
+			}
+			o.metrics = append(o.metrics, newMetric)
+
+			newMetric, err = prometheus.NewConstMetric(prometheus.NewDesc("avi_se_mem_huge_pages", "AVI SE Memory Distribution Huge Pages", labelNames, nil),
+				prometheus.GaugeValue, float64(dist.HugePages), labelValues...)
+			if err != nil {
+				return err
+			}
+			o.metrics = append(o.metrics, newMetric)
+
+			newMetric, err = prometheus.NewConstMetric(prometheus.NewDesc("avi_se_mem_hypervisor_type", "AVI SE Memory Distribution Hypervisor Type", labelNames, nil),
+				prometheus.GaugeValue, float64(dist.HugePages), labelValues...)
+			if err != nil {
+				return err
+			}
+			o.metrics = append(o.metrics, newMetric)
+
+			newMetric, err = prometheus.NewConstMetric(prometheus.NewDesc("avi_se_mem_num_queues", "AVI SE Memory Distribution Num Queues", labelNames, nil),
+				prometheus.GaugeValue, float64(dist.NumQueues), labelValues...)
+			if err != nil {
+				return err
+			}
+			o.metrics = append(o.metrics, newMetric)
+
+			newMetric, err = prometheus.NewConstMetric(prometheus.NewDesc("avi_se_mem_num_recv", "AVI SE Memory Distribution Num Received", labelNames, nil),
+				prometheus.GaugeValue, float64(dist.NumRXd), labelValues...)
+			if err != nil {
+				return err
+			}
+			o.metrics = append(o.metrics, newMetric)
+
+			newMetric, err = prometheus.NewConstMetric(prometheus.NewDesc("avi_se_mem_num_xmit", "AVI SE Memory Distribution Num Transmitted", labelNames, nil),
+				prometheus.GaugeValue, float64(dist.NumTXd), labelValues...)
+			if err != nil {
+				return err
+			}
+			o.metrics = append(o.metrics, newMetric)
+
+			newMetric, err = prometheus.NewConstMetric(prometheus.NewDesc("avi_se_mem_num_os_reserved_memory_mb", "AVI SE Memory Distribution OS Reserved Memory MB", labelNames, nil),
+				prometheus.GaugeValue, float64(dist.OSReservedMemoryMB), labelValues...)
+			if err != nil {
+				return err
+			}
+			o.metrics = append(o.metrics, newMetric)
+
+			newMetric, err = prometheus.NewConstMetric(prometheus.NewDesc("avi_se_mem_shm_config_memory_mb", "AVI SE Memory Distribution Shared Config Memory MB", labelNames, nil),
+				prometheus.GaugeValue, float64(dist.ShmConfigMemoryMB), labelValues...)
+			if err != nil {
+				return err
+			}
+			o.metrics = append(o.metrics, newMetric)
+
+			newMetric, err = prometheus.NewConstMetric(prometheus.NewDesc("avi_se_mem_shm_conn_memory_mb", "AVI SE Memory Distribution Shared Connection Memory MB", labelNames, nil),
+				prometheus.GaugeValue, float64(dist.ShmConnMemoryMB), labelValues...)
+			if err != nil {
+				return err
+			}
+			o.metrics = append(o.metrics, newMetric)
+
+			//fmt.Printf("seMemDist(): se uuid=%#v\n", se.UUID)
+			//fmt.Printf("seMemDist(): se memDist=%#v\n", memDist)
+		}
 	}
 	return err
 }
@@ -527,8 +634,44 @@ func (o *Exporter) seShMalloc() (err error) {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("seShMalloc(): se uuid=%v\n", se.UUID)
-		fmt.Printf("seShMalloc(): se shMalloc=%v\n", shMalloc)
+		// fmt.Printf("seShMalloc(): se uuid=%#v\n", se.UUID)
+		for _, outerStats := range shMalloc {
+			for _, shMallocStat := range outerStats.ShMallocStatEntry {
+				var labelNames = []string{"controller", "uuid", "ip"}
+				var labelValues = []string{o.connectionOpts.Controller, se.UUID, se.Config.MgmtIpAddress.Addr}
+
+				shMallocMetricName := strings.ToLower(shMallocStat.ShMallocTypeName)
+
+				metricNameSize := fmt.Sprintf("avi_%s_size", shMallocMetricName)
+				metricNameFail := fmt.Sprintf("avi_%s_fail", shMallocMetricName)
+				metricNameCount := fmt.Sprintf("avi_%s_count", shMallocMetricName)
+
+				newMetricSize, err := prometheus.NewConstMetric(prometheus.NewDesc(metricNameSize, "AVI SE Shared Malloc Size Entry", labelNames, nil),
+					prometheus.GaugeValue, float64(shMallocStat.ShMallocTypeSize), labelValues...)
+				if err != nil {
+					return err
+				}
+
+				newMetricFail, err := prometheus.NewConstMetric(prometheus.NewDesc(metricNameFail, "AVI SE Shared Malloc Fail Entry", labelNames, nil),
+					prometheus.GaugeValue, float64(shMallocStat.ShMallocTypeFail), labelValues...)
+				if err != nil {
+					return err
+				}
+
+				newMetricCount, err := prometheus.NewConstMetric(prometheus.NewDesc(metricNameCount, "AVI SE Shared Malloc Count Entry", labelNames, nil),
+					prometheus.GaugeValue, float64(shMallocStat.ShMallocTypeCnt), labelValues...)
+				if err != nil {
+					return err
+				}
+
+				o.metrics = append(o.metrics, newMetricSize)
+				o.metrics = append(o.metrics, newMetricFail)
+				o.metrics = append(o.metrics, newMetricCount)
+				//fmt.Printf("seShMalloc(): se shMallocStat=%#v\n", shMallocStat)
+			}
+		}
+		//fmt.Printf("seShMalloc(): se uuid=%#v\n", se.UUID)
+		//fmt.Printf("seShMalloc(): se shMalloc=%#v\n", shMalloc)
 	}
 	return err
 }
@@ -579,8 +722,8 @@ func (o *Exporter) seBgpPeerState() (err error) {
 			}
 		}
 
-		fmt.Printf("seBgpPeerState(): se uuid=%v\n", se.UUID)
-		fmt.Printf("seBgpPeerState(): se seBGP=%v\n", seBGP)
+		// fmt.Printf("seBgpPeerState(): se uuid=%v\n", se.UUID)
+		// fmt.Printf("seBgpPeerState(): se seBGP=%v\n", seBGP)
 	}
 	return err
 }

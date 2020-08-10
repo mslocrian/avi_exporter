@@ -34,7 +34,7 @@ spec:
         runAsGroup: 1000
         fsGroup: 2000
       containers:
-      - image: docker.io/mslocrian/avi_exporter:0.1.3
+      - image: docker.io/mslocrian/avi_exporter:0.2.6
         name: avi-exporter
         env:
         - name: AVI_USERNAME

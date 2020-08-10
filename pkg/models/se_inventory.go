@@ -77,7 +77,7 @@ type ServiceEngineInventoryRunTime struct {
 		State      string   `json:"state"`
 	} `json:"oper_status"`
 	PowerState         string `json:"power_state"`
-	SeConnected        bool `json:"se_connected"`
+	SeConnected        bool   `json:"se_connected"`
 	SeGrpRebootPending bool   `json:"se_grp_reboot_pending"`
 	SufficientMemory   bool   `json:"sufficient_memory"`
 	Version            string `json:"version"`
