@@ -18,3 +18,5 @@ vendor/
 
 *.secret
 *.swp
+*.bak
+avi_exporter

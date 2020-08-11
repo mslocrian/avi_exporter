@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/mslocrian/avi_exporter/pkg/models"
-	//"github.com/go-kit/kit/log/level"
 
 	"github.com/avinetworks/sdk/go/clients"
 	"github.com/avinetworks/sdk/go/session"
@@ -306,10 +306,13 @@ func (o *Exporter) Collect(controller, tenant, api_version string) (metrics []pr
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Set promMetrics.
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	err = o.setVirtualServiceMetrics()
-	if err != nil {
-		return metrics, err
-	}
+	// TODO(stegen) fix this up
+	/*
+		err = o.setVirtualServiceMetrics()
+		if err != nil {
+			return metrics, err
+		}
+	*/
 
 	err = o.setServiceEngineMetrics()
 	if err != nil {
@@ -376,7 +379,7 @@ func (o *Exporter) getVirtualServiceMetrics() (r [][]models.CollectionResponse, 
 	}
 
 	resp := make(map[string]map[string][]models.CollectionResponse)
-	err = o.AviClient.AviSession.Post("/api/analytics/metrics/collection", req, &resp)
+	err = o.AviClient.AviSession.Post("api/analytics/metrics/collection", req, &resp)
 
 	if err != nil {
 		return r, err
@@ -404,7 +407,7 @@ func (o *Exporter) getServiceEngineMetrics() (r [][]models.CollectionResponse, e
 	}
 
 	resp := make(map[string]map[string][]models.CollectionResponse)
-	err = o.AviClient.AviSession.Post("/api/analytics/metrics/collection", req, &resp)
+	err = o.AviClient.AviSession.Post("api/analytics/metrics/collection", req, &resp)
 	if err != nil {
 		return r, err
 	}
@@ -430,7 +433,7 @@ func (o *Exporter) getControllerMetrics() (r [][]models.CollectionResponse, err 
 	}
 
 	resp := make(map[string]map[string][]models.CollectionResponse)
-	err = o.AviClient.AviSession.Post("/api/analytics/metrics/collection", req, &resp)
+	err = o.AviClient.AviSession.Post("api/analytics/metrics/collection", req, &resp)
 	if err != nil {
 		return r, err
 	}
@@ -515,7 +518,13 @@ func (o *Exporter) seMemDist() (err error) {
 		var memDist []models.ServiceEngineMemDist
 		err = o.AviClient.AviSession.Get("api/serviceengine/"+se.UUID+"/memdist", &memDist)
 		if err != nil {
-			return err
+			e := err.(session.AviError)
+			if e.HttpStatusCode == 500 {
+				level.Error(o.logger).Log("msg", "There was an error collecting se memdist stats", "error", fmt.Sprintf("%#v", err))
+				continue
+			} else {
+				return err
+			}
 		}
 
 		for _, dist := range memDist {
@@ -632,7 +641,13 @@ func (o *Exporter) seShMalloc() (err error) {
 		var shMalloc []models.ServiceEngineSHMallocStats
 		err = o.AviClient.AviSession.Get("api/serviceengine/"+se.UUID+"/shmallocstats", &shMalloc)
 		if err != nil {
-			return err
+			e := err.(session.AviError)
+			if e.HttpStatusCode == 500 {
+				level.Error(o.logger).Log("msg", "There was an error collecting se shmalloc stats", "error", fmt.Sprintf("%#v", err))
+				continue
+			} else {
+				return err
+			}
 		}
 		// fmt.Printf("seShMalloc(): se uuid=%#v\n", se.UUID)
 		for _, outerStats := range shMalloc {
@@ -681,7 +696,13 @@ func (o *Exporter) seBgpPeerState() (err error) {
 		var seBGP []models.SeBGP
 		err = o.AviClient.AviSession.Get("api/serviceengine/"+se.UUID+"/bgp", &seBGP)
 		if err != nil {
-			return err
+			e := err.(session.AviError)
+			if e.HttpStatusCode == 500 {
+				level.Error(o.logger).Log("msg", "There was an error collecting se bgp stats", "error", fmt.Sprintf("%#v", err))
+				continue
+			} else {
+				return err
+			}
 		}
 
 		for _, peer := range seBGP {
