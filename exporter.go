@@ -44,17 +44,14 @@ func fromJSONFile(path string, ob interface{}) (err error) {
 	openedFile, err := os.Open(path)
 	defer openedFile.Close()
 	if err != nil {
-		// log.Infoln(err)
 		return err
 	}
 	byteValue, err := ioutil.ReadAll(openedFile)
 	if err != nil {
-		// log.Infoln(err)
 		return err
 	}
 	err = json.Unmarshal(byteValue, &toReturn)
 	if err != nil {
-		// log.Infoln(err)
 		return err
 	}
 	return nil
@@ -144,7 +141,6 @@ func (o *Exporter) setUserMetrics() (r string) {
 func NewExporter(username, password string, logger log.Logger) (r *Exporter) {
 	r = new(Exporter)
 	r.userMetricString = r.setUserMetrics()
-	// r.connectionOpts = r.setConnectionOpts(username, password)
 	r.connectionOpts = r.setConnectionOpts()
 	r.GaugeOptsMap = r.setPromMetricsMap()
 	r.logger = logger
@@ -155,8 +151,6 @@ func NewExporter(username, password string, logger log.Logger) (r *Exporter) {
 func (o *Exporter) setConnectionOpts() (r models.ConnectionOpts) {
 	r.Username = os.Getenv("AVI_USERNAME")
 	r.Password = os.Getenv("AVI_PASSWORD")
-	//r.Username = username
-	//r.Password = username
 	return
 }
 
@@ -166,7 +160,6 @@ func (o *Exporter) setController(controller string) {
 
 // connect establishes the avi connection.
 func (o *Exporter) connect(cluster, tenant, api_version string) (r *clients.AviClient, err error) {
-	// o.setConnectionOpts()
 	o.setController(cluster)
 	// simplify avi connection
 	r, err = clients.NewAviClient(cluster, o.connectionOpts.Username,
@@ -291,9 +284,9 @@ func CollectTarget(controller, username, password, tenant, api_version string, l
 
 // Collect retrieves metrics for Avi.
 func (o *Exporter) Collect(controller, tenant, api_version string) (metrics []prometheus.Metric, err error) {
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Connect to the cluster.
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /*
+	 Connect to the cluster.
+     */
 	o.AviClient, err = o.connect(controller, tenant, api_version)
 	if err != nil {
 		return metrics, err
@@ -303,9 +296,9 @@ func (o *Exporter) Collect(controller, tenant, api_version string) (metrics []pr
 		return metrics, err
 	}
 
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Set promMetrics.
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /*
+	 Set promMetrics.
+     */
 	err = o.setVirtualServiceMetrics()
 	if err != nil {
 		return metrics, err
@@ -333,11 +326,6 @@ func (o *Exporter) Collect(controller, tenant, api_version string) (metrics []pr
 
 	// We may not have BGP Metrics on each controller
 	err = o.seBgpPeerState()
-	/*
-		if err != nil {
-			return metrics, err
-		}
-	*/
 
 	err = o.seVnicPortGroup()
 	if err != nil {
@@ -442,12 +430,12 @@ func (o *Exporter) getControllerMetrics() (r [][]models.CollectionResponse, err 
 }
 
 func (o *Exporter) setVirtualServiceMetrics() (err error) {
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Get lb objects for mapping.
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /*
+	 Get lb objects for mapping.
+     */
 	vs, _ := o.getVirtualServices()
 	pools, _ := o.getPools()
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 	results, err := o.getVirtualServiceMetrics()
 	if err != nil {
 		return err
@@ -619,9 +607,6 @@ func (o *Exporter) seMemDist() (err error) {
 				return err
 			}
 			o.metrics = append(o.metrics, newMetric)
-
-			//fmt.Printf("seMemDist(): se uuid=%#v\n", se.UUID)
-			//fmt.Printf("seMemDist(): se memDist=%#v\n", memDist)
 		}
 	}
 	return err
@@ -634,7 +619,6 @@ func (o *Exporter) seShMalloc() (err error) {
 		if err != nil {
 			return err
 		}
-		// fmt.Printf("seShMalloc(): se uuid=%#v\n", se.UUID)
 		for _, outerStats := range shMalloc {
 			for _, shMallocStat := range outerStats.ShMallocStatEntry {
 				var labelNames = []string{"controller", "uuid", "ip"}
@@ -667,11 +651,8 @@ func (o *Exporter) seShMalloc() (err error) {
 				o.metrics = append(o.metrics, newMetricSize)
 				o.metrics = append(o.metrics, newMetricFail)
 				o.metrics = append(o.metrics, newMetricCount)
-				//fmt.Printf("seShMalloc(): se shMallocStat=%#v\n", shMallocStat)
 			}
 		}
-		//fmt.Printf("seShMalloc(): se uuid=%#v\n", se.UUID)
-		//fmt.Printf("seShMalloc(): se shMalloc=%#v\n", shMalloc)
 	}
 	return err
 }
@@ -721,9 +702,6 @@ func (o *Exporter) seBgpPeerState() (err error) {
 				o.metrics = append(o.metrics, newMetric)
 			}
 		}
-
-		// fmt.Printf("seBgpPeerState(): se uuid=%v\n", se.UUID)
-		// fmt.Printf("seBgpPeerState(): se seBGP=%v\n", seBGP)
 	}
 	return err
 }
