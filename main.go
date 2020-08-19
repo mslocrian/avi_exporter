@@ -16,7 +16,7 @@ import (
 
 const (
 	AVI_API_VERSION = "18.2.1"
-	AVI_TENANT      = "admin"
+	AVI_TENANT      = "*"
 )
 
 var (
