@@ -20,3 +20,5 @@ vendor/
 *.swp
 *.bak
 avi_exporter
+*.env
+start.sh

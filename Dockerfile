@@ -1,7 +1,7 @@
 ##################################################################
 # Build binary.
 ##################################################################
-FROM golang:1.16.5 as build
+FROM golang:1.17.3 as build
 WORKDIR /go/src/github.com/mslocrian/avi_exporter
 ADD . .
 RUN make build-local

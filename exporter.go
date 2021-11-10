@@ -36,7 +36,11 @@ type Exporter struct {
 	gauges           models.Gauges
 	logger           log.Logger
 	ses              *models.SeInventory
+	vsinv            []models.VirtualServiceInventory
 	metrics          []prometheus.Metric
+	tenants          *models.TenantInventory
+	clouds           *models.CloudInventory
+	segroups         *models.SeGroupInventory
 }
 
 func fromJSONFile(path string, ob interface{}) (err error) {
@@ -102,15 +106,15 @@ func (o *Exporter) setAllMetricsMap() (r models.GaugeOptsMap, err error) {
 	//////////////////////////////////////////////////////////////////////////////
 	for _, v := range vsDefaultMetrics {
 		fName := strings.ReplaceAll(v.Metric, ".", "_")
-		r[v.Metric] = models.GaugeOpts{CustomLabels: []string{"name", "fqdn", "ipaddress", "pool", "tenant_uuid", "units", "controller"}, Type: "virtualservice", GaugeOpts: prometheus.GaugeOpts{Name: fName, Help: v.Help}}
+		r[v.Metric] = models.GaugeOpts{CustomLabels: []string{"name", "fqdn", "ipaddress", "pool", "tenant_uuid", "tenant", "units", "controller"}, Type: "virtualservice", GaugeOpts: prometheus.GaugeOpts{Name: fName, Help: v.Help}}
 	}
 	for _, v := range seDefaultMetrics {
 		fName := strings.ReplaceAll(v.Metric, ".", "_")
-		r[v.Metric] = models.GaugeOpts{CustomLabels: []string{"name", "entity_uuid", "fqdn", "ipaddress", "tenant_uuid", "units", "controller"}, Type: "serviceengine", GaugeOpts: prometheus.GaugeOpts{Name: fName, Help: v.Help}}
+		r[v.Metric] = models.GaugeOpts{CustomLabels: []string{"name", "entity_uuid", "fqdn", "ipaddress", "tenant_uuid", "tenant", "units", "controller"}, Type: "serviceengine", GaugeOpts: prometheus.GaugeOpts{Name: fName, Help: v.Help}}
 	}
 	for _, v := range controllerDefaultMetrics {
 		fName := strings.ReplaceAll(v.Metric, ".", "_")
-		r[v.Metric] = models.GaugeOpts{CustomLabels: []string{"name", "entity_uuid", "fqdn", "ipaddress", "tenant_uuid", "units", "controller"}, Type: "controller", GaugeOpts: prometheus.GaugeOpts{Name: fName, Help: v.Help}}
+		r[v.Metric] = models.GaugeOpts{CustomLabels: []string{"name", "entity_uuid", "fqdn", "ipaddress", "tenant_uuid", "tenant", "units", "controller"}, Type: "controller", GaugeOpts: prometheus.GaugeOpts{Name: fName, Help: v.Help}}
 	}
 	//////////////////////////////////////////////////////////////////////////////
 	return r, nil
@@ -294,7 +298,43 @@ func (o *Exporter) Collect(controller, tenant, api_version string) (metrics []pr
 	if err != nil {
 		return metrics, err
 	}
-	err = o.AviClient.AviSession.Get("api/serviceengine-inventory?page_size=100", &o.ses)
+	err = o.AviClient.AviSession.Get("api/serviceengine-inventory?page_size=200", &o.ses)
+	if err != nil {
+		return metrics, err
+	}
+
+	err = o.AviClient.AviSession.Get("api/tenant?page_size=200", &o.tenants)
+	if err != nil {
+		return metrics, err
+	}
+
+	err = o.AviClient.AviSession.Get("api/cloud?page_size=200", &o.clouds)
+	if err != nil {
+		return metrics, err
+	}
+
+	err = o.AviClient.AviSession.Get("api/serviceenginegroup?page_size=200", &o.segroups)
+	if err != nil {
+		return metrics, err
+	}
+
+	// We need to pull un-exposed VS Faults (asymmetric vs's)
+	page_iter := 1
+	for {
+		res := &models.VsInventory{}
+		uri := fmt.Sprintf("api/virtualservice-inventory?page_size=200&page=%v", page_iter)
+		err = o.AviClient.AviSession.Get(uri, res)
+		count := res.Count
+		for _, result := range res.Results {
+			o.vsinv = append(o.vsinv, result)
+		}
+		if len(o.vsinv) >= int(count) {
+			break
+		}
+		page_iter += 1
+	}
+
+	err = o.setVirtualServiceFaultMetrics()
 	if err != nil {
 		return metrics, err
 	}
@@ -454,8 +494,8 @@ func (o *Exporter) setVirtualServiceMetrics() (err error) {
 	}
 	for _, v := range results {
 		for _, v1 := range v {
-			var labelNames = []string{"name", "pool", "tenant_uuid", "controller", "units", "fqdn", "ipaddress"}
-			var labelValues = []string{vs[v1.Header.EntityUUID].Name, pools[vs[v1.Header.EntityUUID].PoolUUID].Name, v1.Header.TenantUUID, o.connectionOpts.Controller, v1.Header.Units, vs[v1.Header.EntityUUID].FQDN, vs[v1.Header.EntityUUID].IPAddress}
+			var labelNames = []string{"name", "pool", "tenant_uuid", "tenant", "controller", "units", "fqdn", "ipaddress"}
+			var labelValues = []string{vs[v1.Header.EntityUUID].Name, pools[vs[v1.Header.EntityUUID].PoolUUID].Name, v1.Header.TenantUUID, o.getTenantNameFromUUID(v1.Header.TenantUUID), o.connectionOpts.Controller, v1.Header.Units, vs[v1.Header.EntityUUID].FQDN, vs[v1.Header.EntityUUID].IPAddress}
 			newMetric, err := prometheus.NewConstMetric(prometheus.NewDesc("avi_virtual_"+strings.Replace(v1.Header.Name, ".", "_", -1), "Virtual Service Metrics", labelNames, nil),
 				prometheus.GaugeValue, v1.Data[len(v1.Data)-1].Value, labelValues...)
 			if err != nil {
@@ -475,10 +515,30 @@ func (o *Exporter) setServiceEngineMetrics() (err error) {
 	}
 	for _, v := range results {
 		for _, v1 := range v {
-			var labelNames = []string{"tenant_uuid", "entity_uuid", "controller", "units", "name", "fqdn", "ipaddress"}
-			var labelValues = []string{v1.Header.TenantUUID, v1.Header.EntityUUID, o.connectionOpts.Controller, v1.Header.Units, ses[v1.Header.EntityUUID].Name, ses[v1.Header.EntityUUID].FQDN, ses[v1.Header.EntityUUID].IPAddress}
+			var labelNames = []string{"tenant_uuid", "tenant", "entity_uuid", "controller", "units", "name", "fqdn", "ipaddress"}
+			var labelValues = []string{v1.Header.TenantUUID, o.getTenantNameFromUUID(v1.Header.TenantUUID), v1.Header.EntityUUID, o.connectionOpts.Controller, v1.Header.Units, ses[v1.Header.EntityUUID].Name, ses[v1.Header.EntityUUID].FQDN, ses[v1.Header.EntityUUID].IPAddress}
 			newMetric, err := prometheus.NewConstMetric(prometheus.NewDesc("avi_"+strings.Replace(v1.Header.Name, ".", "_", -1), "Service Engine Metrics", labelNames, nil),
 				prometheus.GaugeValue, v1.Data[len(v1.Data)-1].Value, labelValues...)
+			if err != nil {
+				return err
+			}
+			o.metrics = append(o.metrics, newMetric)
+		}
+	}
+	return nil
+}
+
+func (o *Exporter) setVirtualServiceFaultMetrics() (err error) {
+	for _, vs := range o.vsinv {
+		faults := vs.Faults.(map[string]interface{})
+		if _, found := faults["shared_vip"]; found {
+			tenantSplit := strings.Split(vs.Config.TenantRef, "/")
+			cloudSplit := strings.Split(vs.Config.CloudRef, "/")
+			seGroupSplit := strings.Split(vs.Config.SEGroupRef, "/")
+			var labelNames = []string{"name", "uuid", "tenant", "cloud", "se_group", "controller"}
+			var labelValues = []string{vs.Config.Name, vs.Config.UUID, o.getTenantNameFromUUID(tenantSplit[len(tenantSplit)-1]), o.getCloudNameFromUUID(cloudSplit[len(cloudSplit)-1]), o.getSEGroupNameFromUUID(seGroupSplit[len(seGroupSplit)-1]), o.connectionOpts.Controller}
+			newMetric, err := prometheus.NewConstMetric(prometheus.NewDesc("avi_vs_fault_shared_vip", "Virtual Service Shared VIP Fault Metrics", labelNames, nil),
+				prometheus.GaugeValue, 1, labelValues...)
 			if err != nil {
 				return err
 			}
@@ -497,9 +557,9 @@ func (o *Exporter) setControllerMetrics() (err error) {
 	}
 	for _, v := range results {
 		for _, v1 := range v {
-			var labelNames = []string{"tenant_uuid", "entity_uuid", "controller", "units", "name", "fqdn", "ipaddress"}
-			var labelValues = []string{v1.Header.TenantUUID, v1.Header.EntityUUID, o.connectionOpts.Controller, v1.Header.Units, runtime[v1.Header.EntityUUID].Name, runtime[v1.Header.EntityUUID].FQDN, runtime[v1.Header.EntityUUID].IPAddress}
-			newMetric, err := prometheus.NewConstMetric(prometheus.NewDesc("avi_"+strings.Replace(v1.Header.Name, ".", "_", -1), "Controller Metrics", labelNames, nil),
+			var labelNames = []string{"tenant_uuid", "tenant", "entity_uuid", "controller", "units", "name", "fqdn", "ipaddress"}
+			var labelValues = []string{v1.Header.TenantUUID, o.getTenantNameFromUUID(v1.Header.TenantUUID), v1.Header.EntityUUID, o.connectionOpts.Controller, v1.Header.Units, runtime[v1.Header.EntityUUID].Name, runtime[v1.Header.EntityUUID].FQDN, runtime[v1.Header.EntityUUID].IPAddress}
+			newMetric, err := prometheus.NewConstMetric(prometheus.NewDesc("avi_"+strings.ReplaceAll(v1.Header.Name, ".", "_"), "Controller Metrics", labelNames, nil),
 				prometheus.GaugeValue, v1.Data[len(v1.Data)-1].Value, labelValues...)
 			if err != nil {
 				return err
@@ -875,4 +935,34 @@ func (o *Exporter) getLicenseExpiration() (err error) {
 		o.metrics = append(o.metrics, newMetric)
 	}
 	return nil
+}
+
+func (o *Exporter) getTenantNameFromUUID(uuid string) string {
+	for _, tenant := range o.tenants.Results {
+		tenantMap := tenant.(map[string]interface{})
+		if tenantMap["uuid"] == uuid {
+			return tenantMap["name"].(string)
+		}
+	}
+	return "unknown"
+}
+
+func (o *Exporter) getCloudNameFromUUID(uuid string) string {
+	for _, cloud := range o.clouds.Results {
+		cloudMap := cloud.(map[string]interface{})
+		if cloudMap["uuid"] == uuid {
+			return cloudMap["name"].(string)
+		}
+	}
+	return "unknown"
+}
+
+func (o *Exporter) getSEGroupNameFromUUID(uuid string) string {
+	for _, seg := range o.segroups.Results {
+		segMap := seg.(map[string]interface{})
+		if segMap["uuid"] == uuid {
+			return segMap["name"].(string)
+		}
+	}
+	return "unknown"
 }
