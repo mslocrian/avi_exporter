@@ -132,10 +132,30 @@ func main() {
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>
-             <head><title>AVI Exporter</title></head>
+             <head>
+			 <title>AVI Exporter</title>
+			 <style>
+			 label{
+			 display:inline-block;
+			 width:75px;
+			 }
+			 form label {
+			 margin: 10px;
+			 }
+			 form input {
+			 margin: 10px;
+			 }
+			 </style>
+			 </head>
              <body>
              <h1>AVI Exporter</h1>
              <p><a href='` + *metricsPath + `'>Metrics</a></p>
+			 <form action="/avi">
+			 <label>Controller:</label><input type="text" name="controller" placeholder="avi.hostname" value="avi.hostname"><br>
+			 <label>API Version:</label><input type="text" name="api_version" placeholder="20.1.4" value="20.1.4"><br>
+			 <label>Tenant:</label><input type="text" name="tenant" placeholder="admin" value="admin"><br>
+			 <input type="submit" value="Submit">
+			 </form>
              </body>
              </html>`))
 	})
