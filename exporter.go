@@ -201,6 +201,9 @@ func (o *Exporter) getVirtualServices() (r map[string]models.VirtualServiceDef, 
 	}
 	r = make(map[string]models.VirtualServiceDef)
 	for _, v := range vs {
+		if v.Vip == nil {
+			continue
+		}
 		vip := v.Vip[0]
 		address := *vip.IPAddress.Addr
 		dns, _ := net.LookupAddr(address)
@@ -299,10 +302,19 @@ func (o *Exporter) Collect(controller, tenant, api_version string) (metrics []pr
 	/*
 	 Set promMetrics.
 	*/
-	err = o.setVirtualServiceMetrics()
-	if err != nil {
-		return metrics, err
-	}
+	/*
+		stegen - fix this
+		" value:"" > label:<name:"pool" value:"" > label:<name:"tenant_uuid" value:"tenant-0a01a6d4-b3e0-4ffb-bd0d-73b30f2bf4b2" > label:<name:"units" value:"BITS_PER_SECOND" > gauge:<value:0 > } was collected before with the same name and label values
+		* collected metric "avi_virtual_l4_server_avg_goodput" { label:<name:"controller" value:"lb-ctrl2-pub.or1.ne.adobe.net" > label:<name:"fqdn" value:"" > label:<name:"ipaddress" value:"" > label:<name:"name" value:"" > label:<name:"pool" value:"" > label:<name:"tenant_uuid" value:"tenant-0a01a6d4-b3e0-4ffb-bd0d-73b30f2bf4b2" > label:<name:"units" value:"BYTES_PER_SECOND" > gauge:<value:0 > } was collected before with the same name and label values
+
+	*/
+
+	/*
+		err = o.setVirtualServiceMetrics()
+		if err != nil {
+			return metrics, err
+		}
+	*/
 
 	err = o.setServiceEngineMetrics()
 	if err != nil {
@@ -444,7 +456,7 @@ func (o *Exporter) setVirtualServiceMetrics() (err error) {
 		for _, v1 := range v {
 			var labelNames = []string{"name", "pool", "tenant_uuid", "controller", "units", "fqdn", "ipaddress"}
 			var labelValues = []string{vs[v1.Header.EntityUUID].Name, pools[vs[v1.Header.EntityUUID].PoolUUID].Name, v1.Header.TenantUUID, o.connectionOpts.Controller, v1.Header.Units, vs[v1.Header.EntityUUID].FQDN, vs[v1.Header.EntityUUID].IPAddress}
-			newMetric, err := prometheus.NewConstMetric(prometheus.NewDesc("avi_"+strings.Replace(v1.Header.Name, ".", "_", -1), "Service Engine Metrics", labelNames, nil),
+			newMetric, err := prometheus.NewConstMetric(prometheus.NewDesc("avi_virtual_"+strings.Replace(v1.Header.Name, ".", "_", -1), "Virtual Service Metrics", labelNames, nil),
 				prometheus.GaugeValue, v1.Data[len(v1.Data)-1].Value, labelValues...)
 			if err != nil {
 				return err
@@ -762,47 +774,78 @@ func (o *Exporter) getLicenseUsage() (err error) {
 
 	var labelNames = []string{"controller"}
 	var labelValues = []string{o.connectionOpts.Controller}
-	newMetric, err := prometheus.NewConstMetric(prometheus.NewDesc("avi_license_licensed_ses_total", "AVI Total Licensed Service Engines", labelNames, nil),
-		prometheus.GaugeValue, licensing["licensed_ses"].(float64), labelValues...)
-	if err != nil {
-		return err
-	}
-	o.metrics = append(o.metrics, newMetric)
 
-	newMetric, err = prometheus.NewConstMetric(prometheus.NewDesc("avi_license_licensed_ses_used", "AVI Total Used Service Engines", labelNames, nil),
-		prometheus.GaugeValue, licensing["num_ses"].(float64), labelValues...)
-	if err != nil {
-		return err
+	if _, ok := licensing["licensed_ses"]; ok {
+		newMetric, err := prometheus.NewConstMetric(prometheus.NewDesc("avi_license_licensed_ses_total", "AVI Total Licensed Service Engines", labelNames, nil),
+			prometheus.GaugeValue, licensing["licensed_ses"].(float64), labelValues...)
+		if err != nil {
+			return err
+		}
+		o.metrics = append(o.metrics, newMetric)
 	}
-	o.metrics = append(o.metrics, newMetric)
 
-	newMetric, err = prometheus.NewConstMetric(prometheus.NewDesc("avi_license_licensed_cores_total", "AVI Total Licensed Cores", labelNames, nil),
-		prometheus.GaugeValue, licensing["licensed_cores"].(float64), labelValues...)
-	if err != nil {
-		return err
+	if _, ok := licensing["num_ses"]; ok {
+		newMetric, err := prometheus.NewConstMetric(prometheus.NewDesc("avi_license_licensed_ses_used", "AVI Total Used Service Engines", labelNames, nil),
+			prometheus.GaugeValue, licensing["num_ses"].(float64), labelValues...)
+		if err != nil {
+			return err
+		}
+		o.metrics = append(o.metrics, newMetric)
 	}
-	o.metrics = append(o.metrics, newMetric)
 
-	newMetric, err = prometheus.NewConstMetric(prometheus.NewDesc("avi_license_licensed_cores_used", "AVI Total Used Cores", labelNames, nil),
-		prometheus.GaugeValue, licensing["num_se_vcpus"].(float64), labelValues...)
-	if err != nil {
-		return err
+	if _, ok := licensing["licensed_cores"]; ok {
+		newMetric, err := prometheus.NewConstMetric(prometheus.NewDesc("avi_license_licensed_cores_total", "AVI Total Licensed Cores", labelNames, nil),
+			prometheus.GaugeValue, licensing["licensed_cores"].(float64), labelValues...)
+		if err != nil {
+			return err
+		}
+		o.metrics = append(o.metrics, newMetric)
 	}
-	o.metrics = append(o.metrics, newMetric)
 
-	newMetric, err = prometheus.NewConstMetric(prometheus.NewDesc("avi_license_licensed_sockets_total", "AVI Total Licensed Sockets", labelNames, nil),
-		prometheus.GaugeValue, licensing["licensed_sockets"].(float64), labelValues...)
-	if err != nil {
-		return err
+	if _, ok := licensing["licensed_service_cores"]; ok {
+		newMetric, err := prometheus.NewConstMetric(prometheus.NewDesc("avi_license_licensed_service_cores_total", "AVI Total Licensed Cores", labelNames, nil),
+			prometheus.GaugeValue, licensing["licensed_service_cores"].(float64), labelValues...)
+		if err != nil {
+			return err
+		}
+		o.metrics = append(o.metrics, newMetric)
 	}
-	o.metrics = append(o.metrics, newMetric)
 
-	newMetric, err = prometheus.NewConstMetric(prometheus.NewDesc("avi_license_licensed_sockets_used", "AVI Total Used Sockets", labelNames, nil),
-		prometheus.GaugeValue, licensing["num_sockets"].(float64), labelValues...)
-	if err != nil {
-		return err
+	if _, ok := licensing["consumed_service_cores"]; ok {
+		newMetric, err := prometheus.NewConstMetric(prometheus.NewDesc("avi_license_consumed_service_cores_total", "AVI Total Licensed Cores", labelNames, nil),
+			prometheus.GaugeValue, licensing["consumed_service_cores"].(float64), labelValues...)
+		if err != nil {
+			return err
+		}
+		o.metrics = append(o.metrics, newMetric)
 	}
-	o.metrics = append(o.metrics, newMetric)
+
+	if _, ok := licensing["num_se_vcpus"]; ok {
+		newMetric, err := prometheus.NewConstMetric(prometheus.NewDesc("avi_license_licensed_cores_used", "AVI Total Used Cores", labelNames, nil),
+			prometheus.GaugeValue, licensing["num_se_vcpus"].(float64), labelValues...)
+		if err != nil {
+			return err
+		}
+		o.metrics = append(o.metrics, newMetric)
+	}
+
+	if _, ok := licensing["licensed_sockets"]; ok {
+		newMetric, err := prometheus.NewConstMetric(prometheus.NewDesc("avi_license_licensed_sockets_total", "AVI Total Licensed Sockets", labelNames, nil),
+			prometheus.GaugeValue, licensing["licensed_sockets"].(float64), labelValues...)
+		if err != nil {
+			return err
+		}
+		o.metrics = append(o.metrics, newMetric)
+	}
+
+	if _, ok := licensing["num_sockets"]; ok {
+		newMetric, err := prometheus.NewConstMetric(prometheus.NewDesc("avi_license_licensed_sockets_used", "AVI Total Used Sockets", labelNames, nil),
+			prometheus.GaugeValue, licensing["num_sockets"].(float64), labelValues...)
+		if err != nil {
+			return err
+		}
+		o.metrics = append(o.metrics, newMetric)
+	}
 
 	return err
 }

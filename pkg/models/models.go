@@ -175,7 +175,7 @@ type Cluster struct {
 
 type BaseLicense struct {
 	BurstCores   int           `json:"burst_cores"`
-	Cores        int           `json:"cores"`
+	Cores        float64       `json:"cores"`
 	CustomerName string        `json:"customer_name"`
 	LicenseID    string        `json:"license_id"`
 	LicenseTier  []string      `json:"license_tier"`
@@ -192,11 +192,11 @@ type BaseLicense struct {
 }
 
 type LicenseTier struct {
-	BurstCores int    `json:"burst_cores"`
-	Cores      int    `json:"cores"`
-	MaxSes     int    `json:"max_ses"`
-	Sockets    int    `json:"soockets"`
-	TierType   string `json:"tier_type"`
+	BurstCores int     `json:"burst_cores"`
+	Cores      float64 `json:"cores"`
+	MaxSes     int     `json:"max_ses"`
+	Sockets    int     `json:"soockets"`
+	TierType   string  `json:"tier_type"`
 }
 
 type License struct {
@@ -204,12 +204,12 @@ type License struct {
 	CreatedOn    string `json:"created_on"`
 	CustomerName string `json:"customer_name"`
 	//LicenseId     time.Time `json:"license_id"`
-	LicenseId     string `json:"license_id"`
-	LicenseName   string `json:"license_name"`
-	LicenseString string `json:"license_string"`
-	LicenseType   string `json:"license_type"`
-	Sockets       int    `json:"sockets,omitempty"`
-	Cores         int    `json:"cores,omitempty"`
+	LicenseId     string  `json:"license_id"`
+	LicenseName   string  `json:"license_name"`
+	LicenseString string  `json:"license_string"`
+	LicenseType   string  `json:"license_type"`
+	Sockets       int     `json:"sockets,omitempty"`
+	Cores         float64 `json:"cores,omitempty"`
 	//StartOn       time.Time `json:"start_on"`
 	StartOn  string `json:"start_on"`
 	TierType string `json:"tier_type"`

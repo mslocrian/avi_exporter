@@ -4,6 +4,22 @@
         "help": "Transmit and receive network bandwidth across all Service Engine interfaces. (VS, SE)"
     },
     {
+        "metric": "se_if.avg_rx_bytes",
+        "help": "Receive network bytes across all Service Engine interfaces. (VS, SE)"
+    },
+    {
+        "metric": "se_if.avg_tx_bytes",
+        "help": "Transmit network bytes across all Service Engine interfaces. (VS, SE)"
+    },
+    {
+        "metric": "se_if.avg_rx_pkts",
+        "help": "Receive network packets across all Service Engine interfaces. (VS, SE)"
+    },
+    {
+        "metric": "se_if.avg_tx_pkts",
+        "help": "Transmit network packets across all Service Engine interfaces. (VS, SE)"
+    },
+    {
         "metric": "se_stats.avg_connection_mem_usage",
         "help": "Percent of connection memory consumed. (VS, SE)"
     },

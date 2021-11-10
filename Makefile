@@ -19,7 +19,7 @@ BIN_DIR                 ?= $(shell pwd)
 
 export DOCKERHUB_USER = $(or $(DEV_DOCKERHUB_REPO), mslocrian)
 export DOCKERHUB_REPO = $(OUT)
-export DOCKERHUB_VERSION = 0.2.11
+export DOCKERHUB_VERSION = 0.2.13
 
 GO_BUILD_PLATFORM ?= $(GOHOSTOS)-$(GOHOSTARCH)
 PROMU_VERSION ?= 0.5.0
