@@ -1,4 +1,4 @@
-# TMNET-AVI_EXPORTER
+# avi_exporter
 ## Description
 This is a simple Prometheus exporter that collects metrics from the Avi clusters. The exporter is written in Go and is meant to run from Kubernetes.
 
